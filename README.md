@@ -120,7 +120,7 @@ g++ -std=c++17 -O2 -pthread HuffmanCoding.cpp main.cpp -o huffman
 ./huffman decompress output.txt
 ```
 
-> 📄 For full Huffman documentation, header formats, and gotchas → **[huffman/README.md](./huffman/README.md)**
+> 📄 For full Huffman documentation, header formats, and gotchas → **[huffman/README.md](./HuffmanCoding/README.md)**
 
 ---
 
