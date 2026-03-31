@@ -1,116 +1,194 @@
-# File Compressor (C++)
+# 🗜️ FileCompressor
 
-This repository contains a small C++ collection of file **compression / encoding** utilities implemented from scratch. It currently includes:
+> A modular C++ toolkit for file compression and encoding — featuring Huffman coding, LZ4-style fast compression, and Base64 encoding, all built with async/multi-threaded processing.
 
-- **Huffman Coding** (lossless entropy coding)
-- **LZ4 (simplified)** (lossless LZ77-style dictionary compression)
-- **Base64** (binary-to-text encoding)
+---
 
-Each algorithm is implemented as an isolated module with its own entrypoint so you can study, run, and benchmark them independently.
+## 📖 What is FileCompressor?
 
-## Architecture
+FileCompressor is a from-scratch C++ project that implements three classic data encoding and compression algorithms: **Huffman Coding**, a simplified **LZ4-style compressor**, and **Base64 encoding**. Each module is self-contained and production-inspired — using real techniques like chunk-based async I/O, multi-threaded frequency analysis, bit-packing, and LZ77-style back-reference matching. Whether you're learning how compression works under the hood, exploring C++ concurrency primitives, or building a foundation for a larger pipeline, FileCompressor is a clean, readable codebase to study and extend.
 
-At a high level, the repo is organized as three self-contained modules (each with its own `main.cpp` or callable API):
+---
 
-- `HuffmanCoding/` → Huffman-based compressor/decompressor that writes a small header + bitpacked payload.
-- `lz4/` → simplified LZ4-style compressor/decompressor operating on raw bytes (`std::vector<uint8_t>`).
-- `base64/` → multithreaded base64 encoder/decoder operating in 1MB chunks.
+## ✨ Features
 
-```mermaid
-flowchart TB
-    subgraph Repo[prannavdeshpande/file-compressor]
-      HC[HuffmanCoding/]
-      B64[base64/]
-      LZ[lz4/]
-    end
+- **🌳 Huffman Coding** — Entropy-based lossless compression. Builds a frequency table using `std::thread` parallelism, constructs a min-heap Huffman tree, generates optimal prefix codes, and writes a compact bit-packed output with a serialised codebook header.
 
-    HC --> HCMain[main.cpp (CLI)]
-    HC --> HCLib[HuffmanCoding.hpp/.cpp]
+- **⚡ LZ4-Style Compression** — A simplified LZ77 variant inspired by the LZ4 format. Uses a sliding-window hash table to find back-references in previously seen data, emitting tokens of (literals + match offset + match length) for fast, byte-level compression.
 
-    B64 --> B64Lib[base64.h/.cpp]
+- **🔐 Base64 Encoding / Decoding** — Chunk-based Base64 encode and decode with configurable async parallelism via `std::async`. Processes files in 1MB chunks, throttles concurrency with a futures queue, and handles `=` padding correctly at boundaries.
 
-    LZ --> LZMain[main.cpp (CLI)]
-    LZ --> LZLib[lz4.h/.cpp]
+- **🧵 Multi-threaded by default** — Huffman's frequency analysis splits work across all hardware threads. Base64 uses `std::async` futures with a configurable thread limit. Designed for real throughput on large files.
 
-    HCMain -->|compress / decompress| Files[(Input file)]
-    LZMain -->|compress / decompress| Files
-    B64Lib -->|encode / decode| Files
+- **📦 Modular architecture** — Each algorithm lives in its own directory with its own header, implementation, and `main.cpp` CLI wrapper. Drop in just the module you need.
+
+- **🖥️ CLI-first design** — Every module ships with a command-line interface for immediate use without writing any integration code.
+
+---
+
+## 🏗️ Architecture
+
+<!-- Architecture diagram rendered below -->
+
+```
+FileCompressor/
+├── README.md               ← You are here
+├── huffman/
+│   ├── HuffmanCoding.hpp
+│   ├── HuffmanCoding.cpp
+│   ├── main.cpp
+│   └── README.md           ← Module-level docs
+├── lz4/
+│   ├── lz4.h
+│   ├── lz4.cpp
+│   ├── main.cpp
+│   └── README.md           ← Module-level docs
+└── base64/
+    ├── base64.h
+    └── base64.cpp
 ```
 
-## Key features
+### How it all fits together
 
-- Lossless compression with **Huffman Coding** (bitpacking + header for code table)
-- Lossless compression with **LZ4-style** tokens (literals + back-references)
-- **Base64** encode/decode with chunk-based multithreading
-- Minimal dependencies (standard C++ library)
-
-## Activity / flow (typical CLI usage)
-
-```mermaid
-flowchart TD
-    A[Start] --> B{Choose module}
-    B -->|Huffman| C[Run Huffman CLI]
-    B -->|LZ4| D[Run LZ4 CLI]
-    B -->|Base64| E[Call base64::encode/decode]
-
-    C --> F{Mode?}
-    D --> G{Mode?}
-
-    F -->|compress| H[Read input file]
-    F -->|decompress| I[Read compressed file]
-
-    G -->|compress| J[Read input bytes]
-    G -->|decompress| K[Read compressed bytes]
-
-    H --> L[Transform + write output]
-    I --> L
-    J --> L
-    K --> L
-
-    L --> Z[Done]
+```
+                   ┌─────────────────────────────────┐
+                   │        FileCompressor            │
+                   │  C++ Compression & Encoding CLI  │
+                   └────────────┬────────────────────┘
+          ┌─────────────────────┼──────────────────────┐
+          ▼                     ▼                       ▼
+  ┌───────────────┐    ┌────────────────┐    ┌──────────────────┐
+  │    huffman/   │    │     lz4/       │    │    base64/       │
+  │               │    │                │    │                  │
+  │  Entropy-     │    │  LZ77-style    │    │  Chunk-based     │
+  │  based lossless    │  sliding-window│    │  async encode/   │
+  │  compression  │    │  compression   │    │  decode          │
+  │               │    │                │    │                  │
+  │  std::thread  │    │  Hash table    │    │  std::async      │
+  │  freq table   │    │  match search  │    │  futures queue   │
+  └───────┬───────┘    └───────┬────────┘    └────────┬─────────┘
+          │                    │                      │
+          ▼                    ▼                      ▼
+  ┌───────────────┐    ┌────────────────┐    ┌──────────────────┐
+  │  output.txt   │    │  output file   │    │  output file     │
+  │  (bit-packed  │    │  (token stream │    │  (ASCII Base64   │
+  │  + header)    │    │  of lit+match) │    │  or raw bytes)   │
+  └───────────────┘    └────────────────┘    └──────────────────┘
 ```
 
-## Getting started (quick glance)
+### Module deep-dives
 
-> The repo is pure C++. There is no single unified build script yet; each module can be built independently.
-
-### Build & run: Huffman
-
-```bash
-g++ -std=c++17 -O2 HuffmanCoding/main.cpp HuffmanCoding/HuffmanCoding.cpp -o huffman
-./huffman compress <input_file>
-./huffman decompress output.txt
+**Huffman flow:**
+```
+Input file → [multi-threaded freq table] → min-heap tree → DFS prefix codes
+         → write header (char|code`...~~) → bit-pack payload → padding byte
 ```
 
-Outputs:
-- `output.txt` (binary) for compression
-- `decoded_output.txt` for decompression
-
-### Build & run: LZ4
-
-```bash
-g++ -std=c++17 -O2 lz4/main.cpp lz4/lz4.cpp -o lz4tool
-./lz4tool compress <input_file> <output_file>
-./lz4tool decompress <input_file> <output_file>
+**LZ4 flow:**
+```
+Input bytes → sliding window (65535B) → hash table match search
+           → emit token (litLen nibble | matchLen nibble) + literals + offset
+           → flush remaining literals
 ```
 
-### Using Base64
-
-Base64 is exposed as a small API (`base64::encode`, `base64::decode`). You can call it from your own `main.cpp`:
-
-```cpp
-#include "base64/base64.h"
-
-int main() {
-  base64::encode("in.bin", "out.b64", 4);
-  base64::decode("out.b64", "roundtrip.bin", 4);
-}
+**Base64 flow:**
+```
+Input file → 1MB chunks → std::async encode_chunk / decode_chunk
+          → futures queue (throttled to N threads) → write output
 ```
 
 ---
 
-## Module docs
+## 🚀 Getting Started
 
-- `HuffmanCoding/HUFFMAN_CODING.md`
-- `base64/BASE64.md`
-- `lz4/LZ4.md`
+### Prerequisites
+
+- C++17 or later
+- A C++ compiler: `g++`, `clang++`, or MSVC
+- `make` (optional, for build scripts)
+
+### Build & Run — Huffman
+
+```bash
+cd huffman
+g++ -std=c++17 -O2 -pthread HuffmanCoding.cpp main.cpp -o huffman
+
+# Compress a file
+./huffman compress ../myfile.txt
+
+# Decompress
+./huffman decompress output.txt
+```
+
+> 📄 For full Huffman documentation, header formats, and gotchas → **[huffman/README.md](./huffman/README.md)**
+
+---
+
+### Build & Run — LZ4
+
+```bash
+cd lz4
+g++ -std=c++17 -O2 lz4.cpp main.cpp -o lz4
+
+# Compress
+./lz4 compress input.bin output.lz4
+
+# Decompress
+./lz4 decompress output.lz4 restored.bin
+```
+
+> 📄 For full LZ4 documentation, token format, and known limitations → **[lz4/README.md](./lz4/README.md)**
+
+---
+
+### Build & Run — Base64
+
+Base64 is a library module (no standalone CLI). Integrate it directly:
+
+```cpp
+#include "base64/base64.h"
+
+// Encode with 4 async threads
+base64::encode("input.bin", "output.b64", 4);
+
+// Decode
+base64::decode("output.b64", "restored.bin", 4);
+```
+
+```bash
+g++ -std=c++17 -O2 base64/base64.cpp your_main.cpp -o myapp
+```
+
+---
+
+## 📁 Sub-module Documentation
+
+| Module | Description | Docs |
+|--------|-------------|------|
+| 🌳 Huffman | Entropy coding, multi-threaded freq analysis, bit-packed output | [huffman/README.md](./HuffmanCoding/README.md) |
+| ⚡ LZ4 | LZ77-style sliding window compression, hash-table match search | [lz4/README.md](./lz4/README.md) |
+| 🔐 Base64 | Async chunk-based encoding/decoding, configurable thread count | *(see base64.h)* |
+
+---
+
+## ⚠️ Known Limitations
+
+- Huffman `encode()` and `decode()` write to **fixed output filenames** (`output.txt`, `decoded_output.txt`) — configurable paths are a planned improvement.
+- LZ4 is a **simplified educational implementation** and is not byte-compatible with the official LZ4 format.
+- Base64 `threads` parameter must be `> 0` for meaningful concurrency throttling.
+- The LZ4 hash table uses a static allocation — repeated calls in the same process share hash state.
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! If you're a student, C++ developer, or just curious — feel free to open issues, suggest improvements, or submit PRs for:
+
+- Configurable output paths in Huffman
+- Official LZ4 format compatibility
+- A unified CLI combining all three modules
+- Benchmarks and compression ratio comparisons
+
+---
+
+*Built with ❤️ and lots of bit-twiddling.*
