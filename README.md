@@ -27,9 +27,6 @@ FileCompressor is a from-scratch C++ project that implements three classic data 
 ---
 
 ## 🏗️ Architecture
-
-<!-- Architecture diagram rendered below -->
-
 ```
 FileCompressor/
 ├── README.md               ← You are here
@@ -49,31 +46,17 @@ FileCompressor/
 ```
 
 ### How it all fits together
+```mermaid
+graph TD
+    FC["🗜️ FileCompressor\nC++ Compression & Encoding CLI"]
 
-```
-                   ┌─────────────────────────────────┐
-                   │        FileCompressor            │
-                   │  C++ Compression & Encoding CLI  │
-                   └────────────┬────────────────────┘
-          ┌─────────────────────┼──────────────────────┐
-          ▼                     ▼                       ▼
-  ┌───────────────┐    ┌────────────────┐    ┌──────────────────┐
-  │    huffman/   │    │     lz4/       │    │    base64/       │
-  │               │    │                │    │                  │
-  │  Entropy-     │    │  LZ77-style    │    │  Chunk-based     │
-  │  based lossless    │  sliding-window│    │  async encode/   │
-  │  compression  │    │  compression   │    │  decode          │
-  │               │    │                │    │                  │
-  │  std::thread  │    │  Hash table    │    │  std::async      │
-  │  freq table   │    │  match search  │    │  futures queue   │
-  └───────┬───────┘    └───────┬────────┘    └────────┬─────────┘
-          │                    │                      │
-          ▼                    ▼                      ▼
-  ┌───────────────┐    ┌────────────────┐    ┌──────────────────┐
-  │  output.txt   │    │  output file   │    │  output file     │
-  │  (bit-packed  │    │  (token stream │    │  (ASCII Base64   │
-  │  + header)    │    │  of lit+match) │    │  or raw bytes)   │
-  └───────────────┘    └────────────────┘    └──────────────────┘
+    FC --> HF["🌳 huffman/\nEntropy-based lossless compression\nstd::thread freq table"]
+    FC --> LZ["⚡ lz4/\nLZ77-style sliding-window compression\nHash table match search"]
+    FC --> B64["🔐 base64/\nChunk-based async encode/decode\nstd::async futures queue"]
+
+    HF --> HO["output.txt\nbit-packed + header"]
+    LZ --> LO["output file\ntoken stream of lit+match"]
+    B64 --> BO["output file\nASCII Base64 or raw bytes"]
 ```
 
 ### Module deep-dives
@@ -108,7 +91,6 @@ Input file → 1MB chunks → std::async encode_chunk / decode_chunk
 - `make` (optional, for build scripts)
 
 ### Build & Run — Huffman
-
 ```bash
 cd huffman
 g++ -std=c++17 -O2 -pthread HuffmanCoding.cpp main.cpp -o huffman
@@ -125,7 +107,6 @@ g++ -std=c++17 -O2 -pthread HuffmanCoding.cpp main.cpp -o huffman
 ---
 
 ### Build & Run — LZ4
-
 ```bash
 cd lz4
 g++ -std=c++17 -O2 lz4.cpp main.cpp -o lz4
@@ -144,7 +125,6 @@ g++ -std=c++17 -O2 lz4.cpp main.cpp -o lz4
 ### Build & Run — Base64
 
 Base64 is a library module (no standalone CLI). Integrate it directly:
-
 ```cpp
 #include "base64/base64.h"
 
@@ -154,7 +134,6 @@ base64::encode("input.bin", "output.b64", 4);
 // Decode
 base64::decode("output.b64", "restored.bin", 4);
 ```
-
 ```bash
 g++ -std=c++17 -O2 base64/base64.cpp your_main.cpp -o myapp
 ```
@@ -188,7 +167,3 @@ Contributions welcome! If you're a student, C++ developer, or just curious — f
 - Official LZ4 format compatibility
 - A unified CLI combining all three modules
 - Benchmarks and compression ratio comparisons
-
----
-
-*Built with ❤️ and lots of bit-twiddling.*
